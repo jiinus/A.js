@@ -5,7 +5,7 @@
 	};
 
 	A.prototype = {
-		
+
 		constructor: A,
 
 		indexOf: function(e) {
@@ -44,13 +44,25 @@
 			return result;
 		},
 
-		delete: function(e) {
-			for (var i = 0; i < this.a.length; i++) {
-				if (this.a[i] === e) {
-					this.a.splice(i, 1);
-					break;
+		delete: function(e, all) {
+
+			if (all === undefined) all = false;
+
+			if (e.constructor === Array) {
+				var self = this;
+				new A(e).each(function() {
+					self.delete(this);
+				});
+			} else {
+				var i = this.a.length;
+				while(-1 < --i) {
+					if (this.a[i] === e) {
+						this.a.splice(i, 1);
+						if (!all) break;
+					}
 				}
 			}
+
 			return this.a;
 		},
 
@@ -67,8 +79,13 @@
 			}
 		},
 
+		contains: function(e) {
+			return (this.a.indexOf(e) != -1);
+		},
+
 		exists: function(f) {
 			var i = this.a.length;
+			var e;
 			itemloop:
 			while(--i >= 0) {
 				e = this.a[i];
@@ -89,6 +106,9 @@
 		},
 
 		each: function(callback, debug) {
+
+			if (!this.a) return;
+
 			for (var i = 0; i < this.a.length; i++) {
 				var isFirst = (i == 0);
 				var isLast = (i == (this.a.length - 1));
@@ -142,14 +162,20 @@
 		 * @param ascending True to sort in ascending order, false to sort in descending order
 		 */
 		sort: function(p, ascending) {
+			if (!this.a) return null;
 			if (ascending === undefined) ascending = true;
-			if (p.constructor !== Array) { p = [p]; }
-			var i = p.length;
+			if (p.constructor !== Array) { p = [p]; }
+			var i;
 			this.a.sort(function(a, b) {
+				i = p.length;
 				while(-1 < --i) {
-					pVal = p[i];
+					var pVal = p[i];
 					var aVal = a[pVal];
 					var bVal = b[pVal];
+
+					//console.log('--- pVal:', pVal, a, b);
+					//console.log('--- aVal:', aVal, 'bVal:', bVal);
+
 					if (aVal == bVal) continue;
 					if (aVal < bVal) return (ascending) ? -1 : 1;
 					if (aVal > bVal) return (ascending) ? 1 : -1;
@@ -159,6 +185,7 @@
 		},
 
 		filter: function(f) { // filter
+			if (!this.a) return null;
 			var r = []; // result
 			itemloop:
 			for (var i = 0; i < this.a.length; i++) { // iterator
@@ -177,8 +204,8 @@
 		},
 
 		get: function(f) {
-			r = this.filter(f);
-			return (r.length) ? r[0] : null;
+			var r = this.filter(f);
+			return (r && r.length) ? r[0] : null;
 		},
 
 		shuffle: function() {
