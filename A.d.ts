@@ -1,0 +1,26 @@
+type PropertyFunction<T> = (childObject:any) => T
+
+declare function A(obj:any[]|any): {
+	indexOf:(e:any) => any,
+	groupBy:(grouperKey:string|PropertyFunction<string>, groupProperty?:string, childProperty?:string) => any,
+	delete:(e:any) => any,
+	filterDelete:(e:any) => any,
+	contains:(e:any) => any,
+	exists:(e:any) => any,
+	first:() => any,
+	last:(e?:any) => any,
+	each:(e:any) => any,
+	eachReverse:(e:any) => any,
+	loop:(e:any) => any,
+	loopReverse:(e:any) => any,
+	pushUnique:(e:any) => any,
+	queue:(e:any) => any,
+	isFirst:(e:any) => any,
+	isLast:(e:any) => any,
+	sort:(e:any) => any,
+	filter:(e:any) => any,
+	exclude:(e:any) => any,
+	count:(e:any) => any,
+	get:(e:any) => any,
+	shuffle:(e:any) => any,
+}

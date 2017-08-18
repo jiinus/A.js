@@ -1,4 +1,7 @@
-!(function() {
+if (typeof ktls === "undefined") {
+	var ktls = {}
+}
+!(function(global) {
 
 	function A(a) {
 		this.a = a;
@@ -17,29 +20,40 @@
 			return -1;
 		},
 
-		groupBy: function(key) {
+		groupBy: function(grouperKey, groupProperty, childProperty) {
 			var result = [];
 			var hashtable = {};
 			var collection;
 
+			if (childProperty === undefined) {
+				childProperty = 'objects';
+			}
+
 			var self = this;
 			this.each(function() {
 				var obj = this;
-				var val = obj[key];
-				if (hashtable[val] === undefined) {
-					hashtable[val] = {
-						'grouper': val,
-						'objects': [obj]
-					};
+				var grouperValue = (typeof(grouperKey) == 'function') ? grouperKey(obj) : obj[grouperKey];
+				if (hashtable[grouperValue] === undefined) {
+					var tGroupItem;
+					if (groupProperty === undefined) {
+						tGroupItem = { 'grouper': grouperValue };
+					} else {
+						tGroupItem = obj[groupProperty];
+					}
+					tGroupItem[childProperty] = [obj]
+					hashtable[grouperValue] = tGroupItem;
+					result.push(tGroupItem)
 				} else {
-					hashtable[val].objects.push(obj);
+					hashtable[grouperValue][childProperty].push(obj);
 				}
 			});
 
+			/*
 			for(var _key in hashtable) {
 				collection = hashtable[_key];
 				result.push(collection)
 			}
+			*/
 
 			return result;
 		},
@@ -68,6 +82,7 @@
 
 		filterDelete: function(f) {
 			var i = this.a.length;
+			var count = 0;
 			itemloop:
 			while(--i >= 0) {
 				e = this.a[i];
@@ -76,7 +91,9 @@
 					if (e[key] !== f[key]) continue itemloop;
 				}
 				this.a.splice(i, 1);
+				count++;
 			}
+			return count;
 		},
 
 		contains: function(e) {
@@ -98,6 +115,10 @@
 			return false;
 		},
 
+		first: function() {
+			return (this.a && this.a.length) ? this.a[0] : null;
+		},
+
 		last: function(i) {
 			if (!this.a.length) return null;
 			if (i === undefined) i = 0;
@@ -109,13 +130,23 @@
 
 			if (!this.a) return;
 
-			for (var i = 0; i < this.a.length; i++) {
-				var isFirst = (i == 0);
-				var isLast = (i == (this.a.length - 1));
-				var result = callback.apply(this.a[i], [i, isFirst, isLast]);
-				if (result === false) break;
-				if (typeof result == 'number') {
-					i = i + result;
+			if (this.a.constructor === Array) {
+				for (var i = 0; i < this.a.length; i++) {
+					var isFirst = (i == 0);
+					var isLast = (i == (this.a.length - 1));
+					var result = callback.apply(this.a[i], [i, isFirst, isLast]);
+					if (result === false) break;
+					if (typeof result == 'number') {
+						i = i + result;
+					}
+				}
+			} else {
+				for (var propName in this.a) {
+					if (this.a.hasOwnProperty(propName)) {
+						var propValue = this.a[propName];
+						var result = callback.apply(propValue, [propName, propValue]);
+						if (result === false) break;
+					}
 				}
 			}
 		},
@@ -127,6 +158,37 @@
 				var isLast = (i == (this.a.length - 1));
 				var result = callback.apply(this.a[i], [i, isFirst, isLast]);
 				if (result === false) break;
+				if (typeof result == 'number') {
+					i = i + result;
+				}
+			}
+		},
+
+		loop: function(callback, debug) {
+
+			if (!this.a) return;
+
+			for (var i = 0, len = this.a.length; i < len; i++) {
+				var isFirst = (i == 0);
+				var isLast = (i == (this.a.length - 1));
+				var result = callback.apply(this.a[i], [this.a[i], i, isFirst, isLast]);
+				if (result === false) return false;
+				if (typeof result == 'number') {
+					i = i + result;
+				}
+			}
+		},
+
+		loopReverse: function(callback, debug) {
+
+			if (!this.a) return;
+
+			var i = this.a.length;
+			while(-1 < --i) {
+				var isFirst = (i == 0);
+				var isLast = (i == (this.a.length - 1));
+				var result = callback.apply(this.a[i], [this.a[i], i, isFirst, isLast]);
+				if (result === false) return false;
 				if (typeof result == 'number') {
 					i = i + result;
 				}
@@ -157,6 +219,10 @@
 			return (this.a.indexOf(e) === this.a.length-1);
 		},
 
+		isArray: function() {
+			return Array.isArray && Array.isArray(this.a)
+		},
+
 		/**
 		 * @param p String or Array of properties to compare
 		 * @param ascending True to sort in ascending order, false to sort in descending order
@@ -182,11 +248,63 @@
 				}
 				return 0;
 			});
+			return this.a;
 		},
 
 		filter: function(f) { // filter
 			if (!this.a) return null;
 			var r = []; // result
+			itemloop:
+			for (var i = 0; i < this.a.length; i++) { // iterator
+				var e = this.a[i]; // element
+				proploop:
+				for (var key in f) {
+					var fVal = f[key];
+					var _a = new A(fVal)
+					if (_a.isArray()) {
+						keyloop:
+						var fValLen = fVal.length;
+						for (var j = 0; j < fValLen; j++) {
+							var _key = key;
+							if (e[_key] === fVal[j]) continue proploop;
+						}
+					} else {
+						if (key[0] === '!') { // Condition is negated by placing ! in front of the key. Such magic! So blergh! Much evil! Muhahahahaahahaahaha!
+							if (e[key.substr(1)] === f[key]) continue itemloop;
+						} else {
+							if (e[key] !== f[key]) continue itemloop;
+						}
+					}
+				}
+				r.push(e);
+			}
+			return r;
+		},
+
+		exclude: function(f) { // filter
+			if (!this.a) return null;
+			var r = []; // result
+			itemloop:
+			for (var i = 0; i < this.a.length; i++) { // iterator
+				var e = this.a[i]; // element
+				proploop:
+				for (var key in f) {
+					var fVal = f[key];
+					var _a = new A(fVal)
+					if (_a.isArray()) {
+						if (~(fVal.indexOf(e[key]))) continue itemloop;
+					} else {
+						if (e[key] === fVal) continue itemloop;
+					}
+				}
+				r.push(e);
+			}
+			return r;
+		},
+
+		count: function(f) {
+			var count = 0;
+			if (!this.a) return count;
 			itemloop:
 			for (var i = 0; i < this.a.length; i++) { // iterator
 				var e = this.a[i]; // element
@@ -198,9 +316,9 @@
 						if (e[key] !== f[key]) continue itemloop;
 					}
 				}
-				r.push(e);
+				count++;
 			}
-			return r;
+			return count;
 		},
 
 		get: function(f) {
@@ -226,8 +344,24 @@
 		},
 	};
 
-	window.A = function(arr) {
-		return new A(arr);
-	};
+	// Store global reference
+	if (global) {
 
-}());
+		global.A = function(arr) {
+			return new A(arr);
+		};
+
+		global.A.append = function(a, b) {
+			if (a && b) {
+				return a.concat(b);
+			} else if (a) {
+				return a.slice();
+			} else if (b) {
+				return b.slice();
+			} else {
+				return [];
+			}
+		};
+	}
+
+}(typeof window !== 'undefined' ? window : ktls));
